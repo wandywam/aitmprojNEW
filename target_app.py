@@ -1,5 +1,4 @@
 
-
 from flask import Flask, request, make_response, redirect, url_for
 import pyotp
 import secrets
@@ -11,23 +10,23 @@ app = Flask(__name__)
 
 totp = pyotp.TOTP("JBSWY3DPEHPK3PXP")  # can enter into Google Authenticator and sync
 
-
-# session_id -> session details
 active_sessions = {}
 
 
 
 
 def get_current_session():
+    #retrieves the session token and data based on the request's session cookie
+    #returns (None, None) if the cookie is missing or the session is invalid
+
     token = request.cookies.get('session_id')
     if not token:
         return None, None
 
-
     session = active_sessions.get(token)
+    
     if not session:
         return None, None
-
 
     return token, session
 
@@ -64,12 +63,14 @@ def home():
 
 
     return '''
-        <h2>Login to your Bank</h2>
+    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column;">
+        <h2>Bank378 Login</h2>
         <form action="/login" method="post">
             User: <input name="user"><br>
             Pass: <input type="password" name="pw"><br>
             <input type="submit" value="Login">
         </form>
+    </div>
     '''
 
 
@@ -79,12 +80,14 @@ def home():
 def login():
     if request.form.get('user') == 'admin' and request.form.get('pw') == 'password':
         return '''
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column;">
             <h2>MFA Required</h2>
             <p>Enter the 6-digit code from your app:</p>
             <form action="/verify" method="post">
                 Code: <input name="code"><br>
                 <input type="submit" value="Verify">
             </form>
+        </div>
         '''
     return "Failed login", 401
 
